@@ -1,0 +1,16 @@
+[Unit]
+Description=Django ASGI WebSocket Server
+After=network.target redis-server.service
+
+[Service]
+User=azureuser
+Group=azureuser
+WorkingDirectory=/path/to/your/project/backend
+ExecStart=/path/to/your/venv/bin/python run_azure_server.py --action start --server daphne
+ExecStop=/path/to/your/venv/bin/python run_azure_server.py --action stop
+Restart=on-failure
+RestartSec=5s
+Environment=DJANGO_SETTINGS_MODULE=backend.settings
+
+[Install]
+WantedBy=multi-user.target
