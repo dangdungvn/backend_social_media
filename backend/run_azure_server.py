@@ -19,35 +19,38 @@ import atexit
 # Thiết lập logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='/tmp/django_server.log',  # Đường dẫn log file
-    filemode='a'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename="/tmp/django_server.log",  # Đường dẫn log file
+    filemode="a",
 )
-logger = logging.getLogger('azure_server')
+logger = logging.getLogger("azure_server")
 
 # Đường dẫn thư mục hiện tại
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PID_FILE = '/tmp/django_server.pid'  # File lưu PID của process
+PID_FILE = "/tmp/django_server.pid"  # File lưu PID của process
+
 
 def check_redis():
     """Kiểm tra xem Redis có đang chạy không."""
     try:
         import redis
+
         client = redis.Redis(host="127.0.0.1", port=6379)
         return client.ping()
     except Exception as e:
         logger.error(f"Lỗi khi kết nối Redis: {e}")
         return False
 
+
 def collect_static():
     """Thu thập static files."""
     try:
         logger.info("Thu thập static files...")
         result = subprocess.run(
-            ["python", "manage.py", "collectstatic", "--noinput"], 
+            ["python", "manage.py", "collectstatic", "--noinput"],
             cwd=CURRENT_DIR,
             capture_output=True,
-            text=True
+            text=True,
         )
         if result.returncode == 0:
             logger.info("Đã thu thập static files thành công.")
@@ -59,91 +62,92 @@ def collect_static():
         logger.error(f"Lỗi khi thu thập static files: {e}")
         return False
 
+
 def start_daphne(daemonize=True):
     """Khởi động server Daphne."""
     try:
         logger.info("Đang khởi động server Daphne...")
-        
+
         # Các options cho Daphne
         daphne_cmd = [
             "daphne",
-            "-b", "0.0.0.0",
-            "-p", "8000",
-            "backend.asgi:application"
+            "-b",
+            "0.0.0.0",
+            "-p",
+            "8000",
+            "backend.asgi:application",
         ]
-        
+
         if daemonize:
             # Khởi động Daphne với nohup để chạy ngầm
-            with open('/tmp/daphne_output.log', 'a') as outfile:
+            with open("/tmp/daphne_output.log", "a") as outfile:
                 process = subprocess.Popen(
                     ["nohup"] + daphne_cmd,
                     stdout=outfile,
                     stderr=outfile,
                     cwd=CURRENT_DIR,
-                    preexec_fn=os.setsid  # Tạo session mới để tránh bị kill khi đóng terminal
+                    preexec_fn=os.setsid,  # Tạo session mới để tránh bị kill khi đóng terminal
                 )
                 # Lưu PID vào file
-                with open(PID_FILE, 'w') as f:
+                with open(PID_FILE, "w") as f:
                     f.write(str(process.pid))
         else:
             # Chạy trong foreground (cho testing)
-            process = subprocess.Popen(
-                daphne_cmd,
-                cwd=CURRENT_DIR
-            )
-        
+            process = subprocess.Popen(daphne_cmd, cwd=CURRENT_DIR)
+
         logger.info(f"Daphne đã được khởi động với PID {process.pid}")
         return process
     except Exception as e:
         logger.error(f"Lỗi khi khởi động Daphne: {e}")
         return None
 
+
 def start_uvicorn(daemonize=True):
     """Khởi động server Uvicorn."""
     try:
         logger.info("Đang khởi động server Uvicorn...")
-        
+
         # Các options cho Uvicorn
         uvicorn_cmd = [
             "uvicorn",
             "backend.asgi:application",
-            "--host", "0.0.0.0",
-            "--port", "8000"
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
         ]
-        
+
         if daemonize:
             # Khởi động Uvicorn với nohup để chạy ngầm
-            with open('/tmp/uvicorn_output.log', 'a') as outfile:
+            with open("/tmp/uvicorn_output.log", "a") as outfile:
                 process = subprocess.Popen(
                     ["nohup"] + uvicorn_cmd,
                     stdout=outfile,
                     stderr=outfile,
                     cwd=CURRENT_DIR,
-                    preexec_fn=os.setsid  # Tạo session mới để tránh bị kill khi đóng terminal
+                    preexec_fn=os.setsid,  # Tạo session mới để tránh bị kill khi đóng terminal
                 )
                 # Lưu PID vào file
-                with open(PID_FILE, 'w') as f:
+                with open(PID_FILE, "w") as f:
                     f.write(str(process.pid))
         else:
             # Chạy trong foreground (cho testing)
-            process = subprocess.Popen(
-                uvicorn_cmd,
-                cwd=CURRENT_DIR
-            )
-        
+            process = subprocess.Popen(uvicorn_cmd, cwd=CURRENT_DIR)
+
         logger.info(f"Uvicorn đã được khởi động với PID {process.pid}")
         return process
     except Exception as e:
         logger.error(f"Lỗi khi khởi động Uvicorn: {e}")
         return None
 
+
 def stop_server():
     """Dừng server đang chạy."""
     try:
         if os.path.exists(PID_FILE):
-            with open(PID_FILE, 'r') as f:
+            with open(PID_FILE, "r") as f:
                 pid = int(f.read().strip())
-            
+
             logger.info(f"Đang dừng server với PID {pid}...")
             try:
                 # Gửi signal SIGTERM để thoát gracefully
@@ -153,29 +157,30 @@ def stop_server():
                 logger.warning(f"Process với PID {pid} không tồn tại")
             except Exception as e:
                 logger.error(f"Lỗi khi dừng process: {e}")
-            
+
             # Xóa file PID
             os.remove(PID_FILE)
             return True
     except Exception as e:
         logger.error(f"Lỗi khi dừng server: {e}")
-    
+
     return False
+
 
 def start_redis_daemon():
     """Khởi động Redis server dưới dạng daemon."""
     try:
         logger.info("Đang kiểm tra và khởi động Redis server...")
-        
+
         # Kiểm tra xem Redis đã chạy chưa
         if check_redis():
             logger.info("Redis server đã đang chạy.")
             return True
-        
+
         # Khởi động Redis với cấu hình daemon
         redis_cmd = ["redis-server", "--daemonize", "yes"]
         result = subprocess.run(redis_cmd, capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             logger.info("Redis server đã được khởi động dưới dạng daemon.")
             return True
@@ -186,77 +191,90 @@ def start_redis_daemon():
         logger.error(f"Lỗi khi khởi động Redis: {e}")
         return False
 
+
 def check_status():
     """Kiểm tra trạng thái server."""
     redis_running = check_redis()
     server_running = os.path.exists(PID_FILE)
-    
+
     if server_running:
-        with open(PID_FILE, 'r') as f:
+        with open(PID_FILE, "r") as f:
             pid = f.read().strip()
         server_status = f"Server đang chạy với PID {pid}"
     else:
         server_status = "Server không chạy"
-    
+
     return {
         "redis": "Đang chạy" if redis_running else "Không chạy",
-        "server": server_status
+        "server": server_status,
     }
+
 
 def main():
     """Hàm chính để chạy server."""
-    parser = argparse.ArgumentParser(description='Quản lý ASGI Server trên Azure VM')
-    parser.add_argument('--action', choices=['start', 'stop', 'restart', 'status'], 
-                        required=True, help='Hành động: start, stop, restart, status')
-    parser.add_argument('--server', choices=['daphne', 'uvicorn'], 
-                        default='daphne', help='ASGI server: daphne hoặc uvicorn (mặc định: daphne)')
-    parser.add_argument('--foreground', action='store_true', 
-                        help='Chạy trong foreground (không daemon hóa)')
-    
+    parser = argparse.ArgumentParser(description="Quản lý ASGI Server trên Azure VM")
+    parser.add_argument(
+        "--action",
+        choices=["start", "stop", "restart", "status"],
+        required=True,
+        help="Hành động: start, stop, restart, status",
+    )
+    parser.add_argument(
+        "--server",
+        choices=["daphne", "uvicorn"],
+        default="uvicorn",
+        help="ASGI server: daphne hoặc uvicorn (mặc định: uvicorn)",
+    )
+    parser.add_argument(
+        "--foreground",
+        action="store_true",
+        help="Chạy trong foreground (không daemon hóa)",
+    )
+
     args = parser.parse_args()
-    
+
     # Xử lý các hành động
-    if args.action == 'status':
+    if args.action == "status":
         status = check_status()
         print(f"Redis: {status['redis']}")
         print(f"Server: {status['server']}")
         return
-    
-    if args.action == 'stop' or args.action == 'restart':
+
+    if args.action == "stop" or args.action == "restart":
         stop_server()
-        if args.action == 'stop':
+        if args.action == "stop":
             return
-    
-    if args.action == 'start' or args.action == 'restart':
+
+    if args.action == "start" or args.action == "restart":
         # Thu thập static files trước
         collect_static()
-        
+
         # Khởi động Redis nếu chưa chạy
         start_redis_daemon()
-        
+
         if not check_redis():
             logger.error("Redis không hoạt động! WebSocket sẽ không hoạt động đúng.")
             print("CẢNH BÁO: Redis không hoạt động! WebSocket sẽ không hoạt động đúng.")
-        
+
         # Khởi động ASGI server
         server_process = None
         daemonize = not args.foreground
-        
-        if args.server == 'daphne':
+
+        if args.server == "daphne":
             server_process = start_daphne(daemonize)
         else:
             server_process = start_uvicorn(daemonize)
-        
+
         if not server_process and daemonize:
             logger.error("Không thể khởi động server.")
             print("Không thể khởi động server.")
             return
-        
+
         logger.info(f"Server đã khởi động tại http://0.0.0.0:8000/")
         print(f"Server đã khởi động tại http://0.0.0.0:8000/")
         print(f"WebSocket có thể truy cập tại ws://0.0.0.0:8000/ws/chat/<room_name>/")
         print(f"Log file: /tmp/django_server.log")
-        
+
         if args.foreground:
             # Trong chế độ foreground, chờ Ctrl+C
             try:
@@ -268,6 +286,7 @@ def main():
                 server_process.terminate()
                 server_process.wait()
                 print("Server đã dừng.")
+
 
 if __name__ == "__main__":
     main()
