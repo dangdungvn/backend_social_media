@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>WebSocket Test for Social App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        #chat-log {
+            height: 400px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+
+        #chat-message-input {
+            width: 80%;
+            padding: 8px;
+        }
+
+        #chat-message-submit {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .message.sent {
+            background-color: #dcf8c6;
+            margin-left: 50px;
+            text-align: right;
+        }
+
+        .message.received {
+            background-color: #f1f0f0;
+            margin-right: 50px;
+        }
+
+        .sender {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chat WebSocket Test</h1>
+
+    <div>
+        <label for="room-name">Room name:</label>
+        <input id="room-name" type="text" value="test-room">
+        <button id="connect-btn">Connect</button>
+        <button id="disconnect-btn" disabled>Disconnect</button>
+        <span id="connection-status">Disconnected</span>
+    </div>
+    <br>
+
+    <div id="chat-log"></div>
+
+    <div>
+        <input id="chat-message-input" type="text" placeholder="Enter your message here" disabled>
+        <button id="chat-message-submit" disabled>Send</button>
+    </div>
+
+    <script>
+        const roomNameInput = document.getElementById('room-name');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const connectionStatus = document.getElementById('connection-status');
+        const chatLog = document.getElementById('chat-log');
+        const messageInput = document.getElementById('chat-message-input');
+        const messageSubmit = document.getElementById('chat-message-submit');
+
+        let socket = null;
+
+        // Connect to WebSocket
+        connectBtn.addEventListener('click', function () {
+            const roomName = roomNameInput.value;
+            if (!roomName) {
+                alert('Please enter a room name');
+                return;
+            }
+
+            // Create WebSocket connection
+            socket = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${roomName}/`);
+
+            // Connection opened
+            socket.addEventListener('open', function (event) {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.style.color = 'green';
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                messageInput.disabled = false;
+                messageSubmit.disabled = false;
+
+                addMessage('System', 'Connected to chat room: ' + roomName, null, 'system');
+            });
+
+            // Connection closed
+            socket.addEventListener('close', function (event) {
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.style.color = 'red';
+
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                messageInput.disabled = true;
+                messageSubmit.disabled = true;
+
+                addMessage('System', 'Disconnected from chat room', null, 'system');
+            });
+
+            // Listen for messages
+            socket.addEventListener('message', function (event) {
+                const data = JSON.parse(event.data);
+                addMessage(data.sender_username || 'Anonymous', data.message, data.timestamp, 'received');
+            });
+
+            // Listen for errors
+            socket.addEventListener('error', function (event) {
+                console.error('WebSocket Error:', event);
+                addMessage('System', 'Error: Could not connect to WebSocket server. Make sure the server is running with Redis.', null, 'error');
+                connectionStatus.textContent = 'Error';
+                connectionStatus.style.color = 'red';
+            });
+        });
+
+        // Disconnect WebSocket
+        disconnectBtn.addEventListener('click', function () {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        });
+
+        // Send message
+        messageSubmit.addEventListener('click', function () {
+            sendMessage();
+        });
+
+        messageInput.addEventListener('keyup', function (event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message && socket) {
+                const messageData = {
+                    type: 'message',
+                    message: message
+                };
+
+                socket.send(JSON.stringify(messageData));
+                addMessage('You', message, new Date().toISOString(), 'sent');
+                messageInput.value = '';
+            }
+        }
+
+        function addMessage(sender, content, timestamp, type = 'received') {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+
+            const senderDiv = document.createElement('div');
+            senderDiv.classList.add('sender');
+            senderDiv.textContent = sender;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('content');
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(senderDiv);
+            messageDiv.appendChild(contentDiv);
+
+            if (timestamp) {
+                const date = new Date(timestamp);
+                const formattedTime = date.toLocaleTimeString();
+
+                const timeDiv = document.createElement('div');
+                timeDiv.classList.add('timestamp');
+                timeDiv.textContent = formattedTime;
+
+                messageDiv.appendChild(timeDiv);
+            }
+
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Static Files - Django Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+
+        #result-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            min-height: 200px;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .file-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .file-list li {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Test Django Static Files và Admin</h1>
+    <p>Kiểm tra các tài nguyên static và trang admin trong dự án Django với Daphne (ASGI)</p>
+
+    <div>
+        <a href="#" class="button" onclick="testAdmin()">Test Admin Page</a>
+        <a href="#" class="button" onclick="testJazzminCSS()">Test Jazzmin CSS</a>
+        <a href="#" class="button" onclick="testAdminCSS()">Test Admin CSS</a>
+        <a href="#" class="button" onclick="testWebsocket()">Test WebSocket URL</a>
+    </div>
+
+    <div id="result-container">
+        <h3>Kết quả:</h3>
+        <div id="result">Chưa chạy test nào.</div>
+    </div>
+
+    <script>
+        // Cấu hình server URL
+        const SERVER_URL = 'http://localhost:8000';
+        const resultElement = document.getElementById('result');
+
+        async function testUrl(url, name) {
+            resultElement.innerHTML = `<p>Đang kiểm tra ${name} (${url})...</p>`;
+
+            try {
+                const response = await fetch(url);
+                const status = response.status;
+                const contentType = response.headers.get('content-type');
+
+                if (response.ok) {
+                    resultElement.innerHTML += `<p class="success">✅ ${name} hoạt động (HTTP ${status})!</p>`;
+                    resultElement.innerHTML += `<p>Loại nội dung: ${contentType}</p>`;
+
+                    if (contentType.includes('text/html')) {
+                        const text = await response.text();
+                        const preview = text.substring(0, 100) + '...';
+                        resultElement.innerHTML += `<p>Xem trước HTML:</p><pre>${preview}</pre>`;
+                    } else if (contentType.includes('text/css')) {
+                        const text = await response.text();
+                        const preview = text.substring(0, 100) + '...';
+                        resultElement.innerHTML += `<p>Xem trước CSS:</p><pre>${preview}</pre>`;
+                    }
+                } else {
+                    resultElement.innerHTML += `<p class="error">❌ ${name} không hoạt động (HTTP ${status})!</p>`;
+                }
+            } catch (error) {
+                resultElement.innerHTML += `<p class="error">❌ Lỗi khi kiểm tra ${name}: ${error.message}</p>`;
+                resultElement.innerHTML += '<p>Có thể là do CORS hoặc server không chạy.</p>';
+            }
+        }
+
+        function testAdmin() {
+            testUrl(`${SERVER_URL}/admin/`, 'Django Admin');
+        }
+
+        function testJazzminCSS() {
+            testUrl(`${SERVER_URL}/static/jazzmin/css/main.css`, 'Jazzmin CSS');
+        }
+
+        function testAdminCSS() {
+            testUrl(`${SERVER_URL}/static/admin/css/base.css`, 'Admin CSS');
+        }
+
+        function testWebsocket() {
+            resultElement.innerHTML = '<p>Kiểm tra WebSocket...</p>';
+
+            try {
+                // Tạo kết nối WebSocket
+                const socket = new WebSocket(`ws://localhost:8000/ws/chat/test-room/`);
+
+                socket.onopen = function (event) {
+                    resultElement.innerHTML += '<p class="success">✅ Kết nối WebSocket thành công!</p>';
+
+                    // Gửi một tin nhắn test
+                    const message = { type: 'message', message: 'Test message from static tester' };
+                    socket.send(JSON.stringify(message));
+                    resultElement.innerHTML += '<p>Đã gửi tin nhắn test.</p>';
+                };
+
+                socket.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    resultElement.innerHTML += `<p>Nhận tin nhắn: ${JSON.stringify(data)}</p>`;
+                };
+
+                socket.onerror = function (event) {
+                    resultElement.innerHTML += `<p class="error">❌ Lỗi WebSocket!</p>`;
+                };
+
+                socket.onclose = function (event) {
+                    resultElement.innerHTML += `<p>WebSocket đã đóng (code: ${event.code})</p>`;
+                };
+
+                // Đóng kết nối sau 5 giây
+                setTimeout(() => {
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.close();
+                        resultElement.innerHTML += '<p>Đã đóng kết nối WebSocket.</p>';
+                    }
+                }, 5000);
+
+            } catch (error) {
+                resultElement.innerHTML += `<p class="error">❌ Lỗi khi kết nối WebSocket: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+
+</html>
