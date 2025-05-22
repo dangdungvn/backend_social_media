@@ -74,7 +74,7 @@ def start_daphne(daemonize=True):
             "-b",
             "0.0.0.0",
             "-p",
-            "8000",
+            "8080",
             "backend.asgi:application",
         ]
 
@@ -114,7 +114,7 @@ def start_uvicorn(daemonize=True):
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            "8080",
         ]
 
         if daemonize:
@@ -270,9 +270,9 @@ def main():
             print("Không thể khởi động server.")
             return
 
-        logger.info(f"Server đã khởi động tại http://0.0.0.0:8000/")
-        print(f"Server đã khởi động tại http://0.0.0.0:8000/")
-        print(f"WebSocket có thể truy cập tại ws://0.0.0.0:8000/ws/chat/<room_name>/")
+        logger.info(f"Server đã khởi động tại http://0.0.0.0:8080/")
+        print(f"Server đã khởi động tại http://0.0.0.0:8080/")
+        print(f"WebSocket có thể truy cập tại ws://0.0.0.0:8080/ws/chat/<room_name>/")
         print(f"Log file: /tmp/django_server.log")
 
         if args.foreground:
